@@ -1,6 +1,6 @@
 // Next/React Imports
-import type { GetServerSideProps, NextPage } from 'next'
-import { useEffect, useState } from 'react'
+import type { GetServerSideProps } from 'next'
+import React, { useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import Head from 'next/head'
@@ -9,84 +9,80 @@ import styles from '../styles/Home.module.css'
 // Services Import
 import { api } from './services/api'
 
-const defaultEndPoint = 'https://rickandmortyapi.com/api/character'
-
-export const getServerSideProps: GetServerSideProps = async () => {
-  const res = await fetch(defaultEndPoint)
-  const data = await res.json()
-
-  return {
-    props: {
-      data,
-    }
-  }
+export type infoType = {
+  count: number,
+  pages: 42,
+  next: string,
+  prev: string
 }
 
-const Home: NextPage = ({ data }) => {
-  const { info, results: defaultResults = [] } = data
+export type resultsType = {
+  id: number
+  name: string
+  status: string
+  species: string
+  gender: string
+  origin: {
+      name: string,
+      url: string
+  },
+  location: {
+      name: string,
+      url: string
+  },
+  image: string,
+  episode: string[],
+  url: string,
+  created: string
+}
 
-  const [results, updateResults] = useState(defaultResults)
-  
+export interface HomePropsType {
+  data: {
+    info: infoType,
+    results: Array<resultsType>
+  } 
+}
+
+const Home = ({ data }: HomePropsType) => {
+  const [results, updateResults] = useState(data.results)
+  const [queryValue, setQueryValue] = useState('')
   const [page, updatePage] = useState({
-    ...info, 
-    current: defaultEndPoint
+    ...data.info, 
+    current: api.get('/character')
   })
 
-  const { current } = page;
-
-  useEffect(() => {
-    if (current === defaultEndPoint) return
-
-    const request = async () => {
-      const res = await fetch(current)
-      const nextData = await res.json()
-
-      updatePage({
-        current, 
-        ...nextData.info
-      })
-
-      if ( nextData.info?.prev ) {
-        updateResults(nextData.results)
-        return
-      }
-
-      updateResults( (prev) => {
-        return [
-          ...prev,
-          ...nextData.results
-        ]
-      })
-    }
-
-    request()
-  }, [current])
-
   const handleLoadMore = async () => {
-    updatePage( (prev) => {
-      return {
-        ...prev,
-        current: page?.next
-      }
+    const nextData = await api.get(`${page.next}&name=${queryValue}`)
+
+    updatePage({
+      current: page.current, 
+      ...nextData.data.info
     })
+
+    if ( nextData.data.info?.prev ) {
+      updateResults([...results, ...nextData.data.results])
+      return
+    }
   }
   
-  const handleOnSubmitSearch = async (e) => {
+  const handleOnSubmitSearch = async (e: React.SyntheticEvent) => {
     e.preventDefault()
 
-    const { currentTarget = {} } = e;
-    const fields = Array.from(currentTarget?.elements)
-    const fieldQuery = fields.find( field => field.name === 'query')
+    try {
+      const { data } = await api.get(`character/?name=${queryValue}`)
 
-    const value = fieldQuery || ''
-    const endpoint = `${defaultEndPoint}/?name=${value}`
-
-    updatePage((prev) => {
-      return {
-        ...prev,
-        current: endpoint
-      }
-    })
+      updateResults(data.results)
+  
+      updatePage((prev) => {
+        return {
+          ...prev,
+          current: data
+        }
+      })
+    } catch(error) {
+      updateResults([])
+      return error
+    }
   }
 
   return (
@@ -106,13 +102,25 @@ const Home: NextPage = ({ data }) => {
           Rick and Morty Wiki
         </p>
 
-        <form action='search' onSubmit={handleOnSubmitSearch}>
-          <input name='query' type='search'/>
-          <button>Search</button>
+        <form 
+          onSubmit={(e) => {
+            e.preventDefault()
+            handleOnSubmitSearch(e)
+          }}
+          onChange={(e) => {
+            e.preventDefault()
+            handleOnSubmitSearch(e)
+          }}
+        >
+          <input 
+            name='query' 
+            type='text' 
+            onChange={(e) => setQueryValue(e.target.value)}
+          />
         </form>
 
         <ul className={styles.grid}>
-          {results.map((item) => {
+          {results?.map((item) => {
             const { id, name, image } = item
             return (
               <li key={id}>
@@ -148,6 +156,12 @@ const Home: NextPage = ({ data }) => {
       </footer>
     </div>
   )
+}
+
+export const getServerSideProps: GetServerSideProps = async () => {
+  const { data } = await api.get('/character')
+
+  return {props: {data}}
 }
 
 export default Home

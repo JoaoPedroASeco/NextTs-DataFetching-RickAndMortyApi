@@ -2,31 +2,38 @@ import type { GetServerSideProps, NextPage } from 'next'
 import Head from 'next/head'
 import Link from 'next/link'
 import styles from '../../../styles/Home.module.css'
+import { api } from '../../services/api'
 
-const defaultEndPoint = 'https://rickandmortyapi.com/api/character'
-
-export const getServerSideProps: GetServerSideProps = async ({ query }) => {
-    const { id } = query
-    const res = await fetch(`${defaultEndPoint}/${id}`)
-    const data = await res.json()
-
-    return {
-        props: {
-            data,
-        }
-    }
+export interface CharacterPropsType {
+    id: number,
+    name: string,
+    status: string,
+    species: string,
+    type: string,
+    gender: string,
+    origin: {
+        name: string,
+        url: string
+    },
+    location: {
+        name: string,
+        url: string
+    },
+    image: string,
+    episode: string[],
+    url: string,
+    created: string
 }
 
-const Character: NextPage = ({ data }) => {
-    const {
-        name,
-        image,
-        gender,
-        location,
-        origin,
-        species,
-        status,
-    } = data
+const Character = ({         
+    name,
+    image,
+    gender,
+    location,
+    origin,
+    species,
+    status 
+}: CharacterPropsType) => {
 
     return (
         <div className={styles.container}>
@@ -37,9 +44,7 @@ const Character: NextPage = ({ data }) => {
             </Head>
 
             <main className={styles.main}>
-                <h1 className={styles.title}>
-                    { name }
-                </h1>
+                <h1 className={styles.title}>{ name }</h1>
 
                 <div>
                     <img src={image} alt={name} />
@@ -71,6 +76,22 @@ const Character: NextPage = ({ data }) => {
             </main>
         </div>
     )
+}
+
+export const getServerSideProps: GetServerSideProps = async ({ query }) => {
+    const { data } = await api.get(`/character/${query.id}`)
+
+    return {
+        props: {
+            name: data.name,
+            image: data.image,
+            gender: data.gender,
+            location: data.location,
+            origin: data.origin,
+            species: data.species,
+            status: data.status,
+        }   
+    }
 }
 
 export default Character
